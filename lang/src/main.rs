@@ -1,21 +1,20 @@
 use std::env;
 
-fn strtol(chars: &Vec<char>, ind: usize) -> Option<(u32, usize)> {
-    let mut i = ind;
-    match chars[i].to_digit(10) {
+fn strtol(chars: &Vec<char>, ind: &mut usize) -> Option<u32> {
+    match chars[*ind].to_digit(10) {
         Some(d) => {
-            i = i + 1;
+            *ind += 1;
             let mut r: u32 = d;
-            while i < chars.len() {
-                match chars[i].to_digit(10) {
+            while *ind < chars.len() {
+                match chars[*ind].to_digit(10) {
                     Some(d) => {
                         r = 10 * r + d;
-                        i += 1;
+                        *ind += 1;
                     }
                     None => break,
                 }
             }
-            return Some((r, i));
+            return Some(r);
         }
         _ => None,
     }
@@ -33,27 +32,20 @@ fn main() {
     println!("main:");
 
     let mut ind = 0;
-    match strtol(&chars, ind) {
-        Some((r, i)) => {
-            ind = i;
+    match strtol(&chars, &mut ind) {
+        Some(r) => {
             println!("  mov rax, {}", r);
             while ind < chars.len() {
                 if chars[ind] == '+' {
                     ind += 1;
-                    match strtol(&chars, ind) {
-                        Some((r, i)) => {
-                            ind = i;
-                            println!("  add rax, {}", r)
-                        }
+                    match strtol(&chars, &mut ind) {
+                        Some(r) => println!("  add rax, {}", r),
                         None => eprintln!("cannot parse at {}", ind),
                     }
                 } else if chars[ind] == '-' {
                     ind += 1;
-                    match strtol(&chars, ind) {
-                        Some((r, i)) => {
-                            ind = i;
-                            println!("  sub rax, {}", r)
-                        }
+                    match strtol(&chars, &mut ind) {
+                        Some(r) => println!("  sub rax, {}", r),
                         None => eprintln!("cannot parse at {}", ind),
                     }
                 } else {
