@@ -11,13 +11,13 @@ fn strtol(chars: &Vec<char>, ind: usize) -> Option<(u32, usize)> {
                     Some(d) => {
                         r = 10 * r + d;
                         i += 1;
-                    },
-                    None => break
+                    }
+                    None => break,
                 }
             }
-            return Some((r, i))
-        },
-        _ => None
+            return Some((r, i));
+        }
+        _ => None,
     }
 }
 
@@ -44,8 +44,8 @@ fn main() {
                         Some((r, i)) => {
                             ind = i;
                             println!("  add rax, {}", r)
-                        },
-                        None => eprintln!("cannot parse at {}", ind)
+                        }
+                        None => eprintln!("cannot parse at {}", ind),
                     }
                 } else if chars[ind] == '-' {
                     ind += 1;
@@ -53,16 +53,16 @@ fn main() {
                         Some((r, i)) => {
                             ind = i;
                             println!("  sub rax, {}", r)
-                        },
-                        None => eprintln!("cannot parse at {}", ind)
+                        }
+                        None => eprintln!("cannot parse at {}", ind),
                     }
                 } else {
                     eprintln!("unexpected char {} at {}", chars[ind], ind);
-                    break
+                    break;
                 }
             }
         }
-        None => eprintln!("cannot parse")
+        None => eprintln!("cannot parse"),
     }
 
     println!("  ret");
