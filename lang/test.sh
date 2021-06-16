@@ -3,7 +3,7 @@ assert() {
     expected="$1"
     input="$2"
 
-    cargo run -q "$input" > tmp.s
+    ./target/debug/lang "$input" > tmp.s
 
     cc -o tmp tmp.s
     ./tmp
@@ -16,6 +16,8 @@ assert() {
         exit 1
     fi
 }
+
+cargo build -q
 
 assert 0 0
 assert 42 42
