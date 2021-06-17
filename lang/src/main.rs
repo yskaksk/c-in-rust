@@ -1,5 +1,22 @@
 use std::env;
 
+enum TokenKind {
+    TK_RESERVED,
+    TK_NUM,
+    TK_EOF,
+}
+
+struct Token {
+    kind: TokenKind,
+    next: Box<Token>,
+    val: Option<u32>,
+    str: String
+}
+
+fn consume(token: &mut Token, op: char) -> bool {
+    
+}
+
 fn strtol(chars: &Vec<char>, ind: &mut usize) -> Option<u32> {
     match chars[*ind].to_digit(10) {
         Some(d) => {
@@ -21,6 +38,9 @@ fn strtol(chars: &Vec<char>, ind: &mut usize) -> Option<u32> {
 }
 
 fn main() {
+
+    let mut token: Token;
+
     let args: Vec<String> = env::args().collect();
     if args.len() > 2 {
         eprintln!("only one arg")
