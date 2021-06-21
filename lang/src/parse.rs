@@ -24,20 +24,18 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
         if c == ' ' {
             i += 1;
             continue;
-        } else if let Some(str) = startwith(&chars, &mut i, vec!["<=", ">=", "==", "!="]) {
+        } else if let Some(str) = startwith(
+            &chars,
+            &mut i,
+            // 2文字のトークンを先にチェックする
+            vec![
+                "<=", ">=", "==", "!=", "+", "-", "*", "/", "(", ")", "<", ">",
+            ],
+        ) {
             let token = Token {
                 kind: TK_RESERVED,
                 val: None,
                 str: str,
-            };
-            tokens.push_back(token);
-            continue;
-        } else if String::from("+-=*/()<>").contains(c) {
-            i += 1;
-            let token = Token {
-                kind: TK_RESERVED,
-                val: None,
-                str: c.to_string(),
             };
             tokens.push_back(token);
             continue;
@@ -63,7 +61,7 @@ fn startwith(chars: &Vec<char>, ind: &mut usize, patterns: Vec<&str>) -> Option<
         let last = cmp::min(i + pat.len(), chars.len());
         let sub_chars = &chars[i..last].iter().collect::<String>();
         if sub_chars.to_string() == pat.to_string() {
-            *ind += 2;
+            *ind += sub_chars.len();
             return Some(sub_chars.to_string());
         }
     }
