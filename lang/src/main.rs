@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types)]
-use std::env;
 use std::collections::VecDeque;
+use std::env;
 
 #[derive(Clone)]
 enum TokenKind {
@@ -8,13 +8,13 @@ enum TokenKind {
     TK_NUM,
 }
 
-use TokenKind::{TK_RESERVED, TK_NUM};
+use TokenKind::{TK_NUM, TK_RESERVED};
 
 #[derive(Clone)]
 struct Token {
     kind: TokenKind,
     val: Option<u32>,
-    str: Vec<char>
+    str: Vec<char>,
 }
 
 #[derive(Clone)]
@@ -23,22 +23,22 @@ enum NodeKind {
     ND_SUB,
     ND_MUL,
     ND_DIV,
-    ND_NUM
+    ND_NUM,
 }
 
-use NodeKind::{ND_ADD, ND_SUB, ND_MUL, ND_DIV, ND_NUM};
+use NodeKind::{ND_ADD, ND_DIV, ND_MUL, ND_NUM, ND_SUB};
 
 #[derive(Clone)]
 struct Node {
     kind: NodeKind,
     lhs: Box<Option<Node>>,
     rhs: Box<Option<Node>>,
-    val: Option<u32>
+    val: Option<u32>,
 }
 
 fn consume(tokens: &mut VecDeque<Token>, op: char) -> bool {
     if tokens.len() < 1 {
-        return false
+        return false;
     }
     let token = tokens.front().unwrap();
     match token.kind {
@@ -49,8 +49,8 @@ fn consume(tokens: &mut VecDeque<Token>, op: char) -> bool {
             } else {
                 return false;
             }
-        },
-        _ => return false
+        }
+        _ => return false,
     }
 }
 
@@ -63,8 +63,8 @@ fn expect(tokens: &mut VecDeque<Token>, op: char) {
             } else {
                 eprintln!("{}ではありません", op)
             }
-        },
-        _ => eprintln!("{}ではありません", op)
+        }
+        _ => eprintln!("{}ではありません", op),
     }
 }
 
@@ -74,9 +74,9 @@ fn expect_number(tokens: &mut VecDeque<Token>) -> Result<u32, String> {
         TK_NUM => {
             let val = token.val.unwrap();
             tokens.pop_front();
-            return Ok(val)
-        },
-        _ => Err(String::from("数ではありません"))
+            return Ok(val);
+        }
+        _ => Err(String::from("数ではありません")),
     }
 }
 
@@ -107,16 +107,16 @@ fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
         let c = chars[i];
         if c == ' ' {
             i += 1;
-            continue
+            continue;
         } else if c == '+' || c == '-' || c == '*' || c == '/' || c == '(' || c == ')' {
             i += 1;
             let token = Token {
                 kind: TK_RESERVED,
                 val: None,
-                str: vec![c].clone()
+                str: vec![c].clone(),
             };
             tokens.push_back(token);
-            continue
+            continue;
         } else if c.is_digit(10) {
             let token = Token {
                 kind: TK_NUM,
@@ -124,12 +124,12 @@ fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
                 str: vec![c].clone(),
             };
             tokens.push_back(token);
-            continue
+            continue;
         } else {
             panic!("トークナイズできません");
         }
     }
-    return tokens
+    return tokens;
 }
 
 fn new_node(kind: NodeKind, lhs: Node, rhs: Node) -> Node {
@@ -137,8 +137,8 @@ fn new_node(kind: NodeKind, lhs: Node, rhs: Node) -> Node {
         kind,
         lhs: Box::new(Some(lhs)),
         rhs: Box::new(Some(rhs)),
-        val: None
-    }
+        val: None,
+    };
 }
 
 fn new_node_num(val: u32) -> Node {
@@ -146,8 +146,8 @@ fn new_node_num(val: u32) -> Node {
         kind: ND_NUM,
         lhs: Box::new(None),
         rhs: Box::new(None),
-        val: Some(val)
-    }
+        val: Some(val),
+    };
 }
 
 fn expr(tokens: &mut VecDeque<Token>) -> Node {
@@ -158,7 +158,7 @@ fn expr(tokens: &mut VecDeque<Token>) -> Node {
         } else if consume(tokens, '-') {
             node = new_node(ND_SUB, node.clone(), mul(tokens));
         } else {
-            return node
+            return node;
         }
     }
 }
@@ -171,7 +171,7 @@ fn mul(tokens: &mut VecDeque<Token>) -> Node {
         } else if consume(tokens, '/') {
             node = new_node(ND_DIV, node.clone(), primary(tokens));
         } else {
-            return node
+            return node;
         }
     }
 }
@@ -180,9 +180,9 @@ fn primary(tokens: &mut VecDeque<Token>) -> Node {
     if consume(tokens, '(') {
         let node = expr(tokens);
         expect(tokens, ')');
-        return node
+        return node;
     } else {
-        return new_node_num(expect_number(tokens).unwrap())
+        return new_node_num(expect_number(tokens).unwrap());
     }
 }
 
@@ -190,8 +190,8 @@ fn gen(node: Node) {
     match node.kind {
         ND_NUM => {
             println!("  push {}", node.val.unwrap());
-            return
-        },
+            return;
+        }
         _ => {
             gen(node.lhs.unwrap());
             gen(node.rhs.unwrap());
@@ -206,8 +206,8 @@ fn gen(node: Node) {
                 ND_DIV => {
                     println!("  cqo");
                     println!("  idiv rdi");
-                },
-                _ => unreachable!()
+                }
+                _ => unreachable!(),
             }
             println!("  push rax");
         }
@@ -215,7 +215,6 @@ fn gen(node: Node) {
 }
 
 fn main() {
-
     let args: Vec<String> = env::args().collect();
     if args.len() > 2 {
         eprintln!("only one arg")
