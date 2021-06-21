@@ -201,16 +201,6 @@ fn new_node_num(val: u32) -> Node {
 // expr       = equality
 fn expr(tokens: &mut VecDeque<Token>) -> Node {
     return equality(tokens);
-    //let mut node: Node = mul(tokens);
-    //loop {
-    //    if consume(tokens, '+') {
-    //        node = new_node(ND_ADD, node.clone(), mul(tokens));
-    //    } else if consume(tokens, '-') {
-    //        node = new_node(ND_SUB, node.clone(), mul(tokens));
-    //    } else {
-    //        return node;
-    //    }
-    //}
 }
 
 // equality   = relational ( "==" relational | "!=" relational)*
@@ -335,7 +325,7 @@ fn gen(node: Node) {
                     println!("  setle al");
                     println!("  movzb rax, al");
                 }
-                _ => unreachable!(),
+                ND_NUM => unreachable!(),
             }
             println!("  push rax");
         }
