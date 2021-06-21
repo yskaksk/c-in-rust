@@ -108,7 +108,7 @@ fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
         if c == ' ' {
             i += 1;
             continue
-        } else if c == '+' || c == '-' {
+        } else if c == '+' || c == '-' || c == '*' || c == '/' || c == '(' || c == ')' {
             i += 1;
             let token = Token {
                 kind: TK_RESERVED,
@@ -126,7 +126,7 @@ fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
             tokens.push_back(token);
             continue
         } else {
-            eprintln!("トークナイズできません")
+            panic!("トークナイズできません");
         }
     }
     return tokens
@@ -195,6 +195,10 @@ fn gen(node: Node) {
         _ => {
             gen(node.lhs.unwrap());
             gen(node.rhs.unwrap());
+
+            println!("  pop rdi");
+            println!("  pop rax");
+
             match node.kind {
                 ND_ADD => println!("  add rax, rdi"),
                 ND_SUB => println!("  sub rax, rdi"),
