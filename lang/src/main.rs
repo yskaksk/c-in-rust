@@ -1,4 +1,5 @@
 #![allow(non_camel_case_types)]
+use std::cmp;
 use std::collections::VecDeque;
 use std::env;
 
@@ -14,7 +15,7 @@ use TokenKind::{TK_NUM, TK_RESERVED};
 struct Token {
     kind: TokenKind,
     val: Option<u32>,
-    str: Vec<char>,
+    str: String,
 }
 
 #[derive(Clone)]
@@ -24,9 +25,13 @@ enum NodeKind {
     ND_MUL,
     ND_DIV,
     ND_NUM,
+    ND_EQ,
+    ND_NE,
+    ND_LT,
+    ND_LE,
 }
 
-use NodeKind::{ND_ADD, ND_DIV, ND_MUL, ND_NUM, ND_SUB};
+use NodeKind::{ND_ADD, ND_DIV, ND_EQ, ND_LE, ND_LT, ND_MUL, ND_NE, ND_NUM, ND_SUB};
 
 #[derive(Clone)]
 struct Node {
@@ -36,14 +41,14 @@ struct Node {
     val: Option<u32>,
 }
 
-fn consume(tokens: &mut VecDeque<Token>, op: char) -> bool {
+fn consume(tokens: &mut VecDeque<Token>, op: &str) -> bool {
     if tokens.len() < 1 {
         return false;
     }
     let token = tokens.front().unwrap();
     match token.kind {
         TK_RESERVED => {
-            if token.str[0] == op {
+            if token.str == op {
                 tokens.pop_front();
                 return true;
             } else {
@@ -54,11 +59,11 @@ fn consume(tokens: &mut VecDeque<Token>, op: char) -> bool {
     }
 }
 
-fn expect(tokens: &mut VecDeque<Token>, op: char) {
+fn expect(tokens: &mut VecDeque<Token>, op: &str) {
     let token = tokens.front().unwrap();
     match token.kind {
         TK_RESERVED => {
-            if token.str[0] == op {
+            if token.str == op {
                 tokens.pop_front();
             } else {
                 eprintln!("{}ではありません", op)
@@ -86,17 +91,28 @@ fn strtol(chars: &Vec<char>, ind: &mut usize) -> Option<u32> {
             *ind += 1;
             let mut r: u32 = d;
             while *ind < chars.len() {
-                match chars[*ind].to_digit(10) {
-                    Some(d) => {
-                        r = 10 * r + d;
-                        *ind += 1;
-                    }
-                    None => break,
+                if let Some(d) = chars[*ind].to_digit(10) {
+                    r = 10 * r + d;
+                    *ind += 1;
+                } else {
+                    break;
                 }
             }
             return Some(r);
         }
         _ => None,
+    }
+}
+
+fn startwith(chars: &Vec<char>, ind: &mut usize, str: &str) -> Option<String> {
+    let i = ind.clone();
+    let last = cmp::min(i + str.len(), chars.len());
+    let sub_chars = &chars[i..last].iter().collect::<String>();
+    if sub_chars.to_string() == str.to_string() {
+        *ind += 2;
+        return Some(sub_chars.to_string());
+    } else {
+        return None;
     }
 }
 
@@ -108,12 +124,44 @@ fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
         if c == ' ' {
             i += 1;
             continue;
-        } else if c == '+' || c == '-' || c == '*' || c == '/' || c == '(' || c == ')' {
+        } else if let Some(str) = startwith(&chars, &mut i, "<=") {
+            let token = Token {
+                kind: TK_RESERVED,
+                val: None,
+                str: str,
+            };
+            tokens.push_back(token);
+            continue;
+        } else if let Some(str) = startwith(&chars, &mut i, ">=") {
+            let token = Token {
+                kind: TK_RESERVED,
+                val: None,
+                str: str,
+            };
+            tokens.push_back(token);
+            continue;
+        } else if let Some(str) = startwith(&chars, &mut i, "==") {
+            let token = Token {
+                kind: TK_RESERVED,
+                val: None,
+                str: str,
+            };
+            tokens.push_back(token);
+            continue;
+        } else if let Some(str) = startwith(&chars, &mut i, "!=") {
+            let token = Token {
+                kind: TK_RESERVED,
+                val: None,
+                str: str,
+            };
+            tokens.push_back(token);
+            continue;
+        } else if String::from("+-=*/()<>").contains(c) {
             i += 1;
             let token = Token {
                 kind: TK_RESERVED,
                 val: None,
-                str: vec![c].clone(),
+                str: c.to_string(),
             };
             tokens.push_back(token);
             continue;
@@ -121,7 +169,7 @@ fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
             let token = Token {
                 kind: TK_NUM,
                 val: strtol(&chars, &mut i),
-                str: vec![c].clone(),
+                str: c.to_string(),
             };
             tokens.push_back(token);
             continue;
@@ -150,12 +198,50 @@ fn new_node_num(val: u32) -> Node {
     };
 }
 
+// expr       = equality
 fn expr(tokens: &mut VecDeque<Token>) -> Node {
+    return equality(tokens);
+}
+
+// equality   = relational ( "==" relational | "!=" relational)*
+fn equality(tokens: &mut VecDeque<Token>) -> Node {
+    let mut node: Node = relational(tokens);
+    loop {
+        if consume(tokens, "==") {
+            node = new_node(ND_EQ, node.clone(), relational(tokens));
+        } else if consume(tokens, "!=") {
+            node = new_node(ND_NE, node.clone(), relational(tokens));
+        } else {
+            return node;
+        }
+    }
+}
+
+// relational = add("<" add | "<=" add | ">" add | ">=" add)*
+fn relational(tokens: &mut VecDeque<Token>) -> Node {
+    let mut node: Node = add(tokens);
+    loop {
+        if consume(tokens, "<") {
+            node = new_node(ND_LT, node.clone(), add(tokens));
+        } else if consume(tokens, "<=") {
+            node = new_node(ND_LE, node.clone(), add(tokens));
+        } else if consume(tokens, ">") {
+            node = new_node(ND_LT, add(tokens), node.clone());
+        } else if consume(tokens, ">=") {
+            node = new_node(ND_LE, add(tokens), node.clone());
+        } else {
+            return node;
+        }
+    }
+}
+
+// add        = mul ("+" mul | "-" mul)*
+fn add(tokens: &mut VecDeque<Token>) -> Node {
     let mut node: Node = mul(tokens);
     loop {
-        if consume(tokens, '+') {
+        if consume(tokens, "+") {
             node = new_node(ND_ADD, node.clone(), mul(tokens));
-        } else if consume(tokens, '-') {
+        } else if consume(tokens, "-") {
             node = new_node(ND_SUB, node.clone(), mul(tokens));
         } else {
             return node;
@@ -163,27 +249,39 @@ fn expr(tokens: &mut VecDeque<Token>) -> Node {
     }
 }
 
+// mul        = unary ("*" unary | "/" unary)*
 fn mul(tokens: &mut VecDeque<Token>) -> Node {
-    let mut node: Node = primary(tokens);
+    let mut node: Node = unary(tokens);
     loop {
-        if consume(tokens, '*') {
-            node = new_node(ND_MUL, node.clone(), primary(tokens));
-        } else if consume(tokens, '/') {
-            node = new_node(ND_DIV, node.clone(), primary(tokens));
+        if consume(tokens, "*") {
+            node = new_node(ND_MUL, node.clone(), unary(tokens));
+        } else if consume(tokens, "/") {
+            node = new_node(ND_DIV, node.clone(), unary(tokens));
         } else {
             return node;
         }
     }
 }
 
-fn primary(tokens: &mut VecDeque<Token>) -> Node {
-    if consume(tokens, '(') {
-        let node = expr(tokens);
-        expect(tokens, ')');
-        return node;
+// unary      = ("+" | "-")? primary
+fn unary(tokens: &mut VecDeque<Token>) -> Node {
+    if consume(tokens, "+") {
+        return unary(tokens);
+    } else if consume(tokens, "-") {
+        return new_node(ND_SUB, new_node_num(0), unary(tokens));
     } else {
-        return new_node_num(expect_number(tokens).unwrap());
+        return primary(tokens);
     }
+}
+
+// primary    = num | "(" expr ")"
+fn primary(tokens: &mut VecDeque<Token>) -> Node {
+    if consume(tokens, "(") {
+        let node = expr(tokens);
+        expect(tokens, ")");
+        return node;
+    }
+    return new_node_num(expect_number(tokens).unwrap());
 }
 
 fn gen(node: Node) {
@@ -207,7 +305,27 @@ fn gen(node: Node) {
                     println!("  cqo");
                     println!("  idiv rdi");
                 }
-                _ => unreachable!(),
+                ND_EQ => {
+                    println!("  cmp rax, rdi");
+                    println!("  sete al");
+                    println!("  movzb rax, al");
+                }
+                ND_NE => {
+                    println!("  cmp rax, rdi");
+                    println!("  setne al");
+                    println!("  movzb rax, al");
+                }
+                ND_LT => {
+                    println!("  cmp rax, rdi");
+                    println!("  setl al");
+                    println!("  movzb rax, al");
+                }
+                ND_LE => {
+                    println!("  cmp rax, rdi");
+                    println!("  setle al");
+                    println!("  movzb rax, al");
+                }
+                ND_NUM => unreachable!(),
             }
             println!("  push rax");
         }
@@ -228,17 +346,6 @@ fn main() {
     println!("main:");
 
     gen(node);
-
-    //println!("  mov rax, {}", expect_number(&mut tokens).unwrap());
-
-    //while !tokens.is_empty() {
-    //    if consume(&mut tokens, '+') {
-    //        println!("  add rax, {}", expect_number(&mut tokens).unwrap());
-    //        continue
-    //    }
-    //    expect(&mut tokens, '-');
-    //    println!("  sub rax, {}", expect_number(&mut tokens).unwrap());
-    //}
 
     println!("  pop rax");
     println!("  ret");
