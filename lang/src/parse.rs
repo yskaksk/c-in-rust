@@ -74,7 +74,8 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
             tokens.push_back(token);
             continue;
         } else {
-            panic!("トークナイズできません");
+            eprintln!(" {} はトークナイズできません", c);
+            std::process::exit(1);
         }
     }
     return tokens;
