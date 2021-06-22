@@ -25,14 +25,12 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
         if c == ' ' {
             i += 1;
             continue;
-        } else if c.is_ascii_lowercase() {
-            i += 1;
-            let token = Token {
+        } else if let Some(str) = startwith_ident(&chars, &mut i) {
+            tokens.push_back(Token {
                 kind: TK_IDENT,
                 val: None,
-                str: c.to_string(),
-            };
-            tokens.push_back(token);
+                str: str,
+            });
             continue;
         } else if let Some(str) = startwith(
             &chars,
@@ -42,20 +40,18 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
                 "<=", ">=", "==", "!=", "+", "-", "*", "/", "(", ")", "<", ">", ";", "=",
             ],
         ) {
-            let token = Token {
+            tokens.push_back(Token {
                 kind: TK_RESERVED,
                 val: None,
                 str: str,
-            };
-            tokens.push_back(token);
+            });
             continue;
         } else if c.is_digit(10) {
-            let token = Token {
+            tokens.push_back(Token {
                 kind: TK_NUM,
                 val: strtol(&chars, &mut i),
                 str: c.to_string(),
-            };
-            tokens.push_back(token);
+            });
             continue;
         } else {
             eprintln!(" {} はトークナイズできません", c);
@@ -63,6 +59,20 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
         }
     }
     return tokens;
+}
+
+fn startwith_ident(chars: &Vec<char>, ind: &mut usize) -> Option<String> {
+    let mut i = ind.clone();
+    let mut char_vec: Vec<char> = Vec::new();
+    while chars[i].is_ascii_lowercase() {
+        char_vec.push(chars[i]);
+        i += 1;
+    }
+    if char_vec.is_empty() {
+        return None;
+    }
+    *ind += char_vec.len();
+    return Some(char_vec.iter().collect());
 }
 
 fn startwith(chars: &Vec<char>, ind: &mut usize, patterns: Vec<&str>) -> Option<String> {

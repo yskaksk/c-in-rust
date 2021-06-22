@@ -17,6 +17,7 @@ assert() {
     fi
 }
 
+echo building...
 cargo build -q
 
 assert 0 "0;"
@@ -51,5 +52,7 @@ assert 0 "1>=2;"
 
 assert 2 "a=1;a+1;"
 assert 6 "a=2;b=3;a*b;"
+
+assert 6 "ab=2;cd=3;ab*cd;"
 
 echo OK
