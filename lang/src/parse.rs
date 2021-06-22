@@ -24,44 +24,18 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
         if c == ' ' {
             i += 1;
             continue;
-        } else if let Some(str) = startwith(&chars, &mut i, "<=") {
+        } else if let Some(str) = startwith(
+            &chars,
+            &mut i,
+            // 2文字のトークンを先にチェックする
+            vec![
+                "<=", ">=", "==", "!=", "+", "-", "*", "/", "(", ")", "<", ">",
+            ],
+        ) {
             let token = Token {
                 kind: TK_RESERVED,
                 val: None,
                 str: str,
-            };
-            tokens.push_back(token);
-            continue;
-        } else if let Some(str) = startwith(&chars, &mut i, ">=") {
-            let token = Token {
-                kind: TK_RESERVED,
-                val: None,
-                str: str,
-            };
-            tokens.push_back(token);
-            continue;
-        } else if let Some(str) = startwith(&chars, &mut i, "==") {
-            let token = Token {
-                kind: TK_RESERVED,
-                val: None,
-                str: str,
-            };
-            tokens.push_back(token);
-            continue;
-        } else if let Some(str) = startwith(&chars, &mut i, "!=") {
-            let token = Token {
-                kind: TK_RESERVED,
-                val: None,
-                str: str,
-            };
-            tokens.push_back(token);
-            continue;
-        } else if String::from("+-=*/()<>").contains(c) {
-            i += 1;
-            let token = Token {
-                kind: TK_RESERVED,
-                val: None,
-                str: c.to_string(),
             };
             tokens.push_back(token);
             continue;
@@ -81,16 +55,18 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
     return tokens;
 }
 
-fn startwith(chars: &Vec<char>, ind: &mut usize, str: &str) -> Option<String> {
+fn startwith(chars: &Vec<char>, ind: &mut usize, patterns: Vec<&str>) -> Option<String> {
     let i = ind.clone();
-    let last = cmp::min(i + str.len(), chars.len());
-    let sub_chars = &chars[i..last].iter().collect::<String>();
-    if sub_chars.to_string() == str.to_string() {
-        *ind += 2;
-        return Some(sub_chars.to_string());
-    } else {
-        return None;
+    for pat in patterns {
+        let sub_chars = &chars[i..cmp::min(i + pat.len(), chars.len())]
+            .iter()
+            .collect::<String>();
+        if sub_chars.to_string() == pat.to_string() {
+            *ind += sub_chars.len();
+            return Some(sub_chars.to_string());
+        }
     }
+    return None;
 }
 
 fn strtol(chars: &Vec<char>, ind: &mut usize) -> Option<u32> {
