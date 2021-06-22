@@ -1,7 +1,7 @@
 use std::env;
 
-use lang::codegen::expr;
 use lang::codegen::gen;
+use lang::codegen::program;
 use lang::parse::tokenize;
 
 fn main() {
@@ -12,14 +12,23 @@ fn main() {
     }
     let chars: Vec<char> = args[1].chars().collect();
     let mut tokens = tokenize(chars);
-    let node = expr(&mut tokens);
+    let nodes = program(&mut tokens);
 
     println!(".intel_syntax noprefix");
     println!(".global main");
     println!("main:");
 
-    gen(node);
+    // 変数用の領域を確保する
+    println!("  push rbp");
+    println!("  mov rbp, rsp");
+    println!("  sub rsp, 208");
 
-    println!("  pop rax");
+    for node in nodes {
+        gen(node);
+        println!("  pop rax");
+    }
+
+    println!("  mov rsp, rbp");
+    println!("  pop rbp");
     println!("  ret");
 }

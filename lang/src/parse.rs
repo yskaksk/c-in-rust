@@ -4,10 +4,11 @@ use std::collections::VecDeque;
 #[derive(Clone)]
 pub enum TokenKind {
     TK_RESERVED,
+    TK_IDENT,
     TK_NUM,
 }
 
-use TokenKind::{TK_NUM, TK_RESERVED};
+use TokenKind::{TK_IDENT, TK_NUM, TK_RESERVED};
 
 #[derive(Clone)]
 pub struct Token {
@@ -24,12 +25,21 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
         if c == ' ' {
             i += 1;
             continue;
+        } else if c.is_ascii_lowercase() {
+            i += 1;
+            let token = Token {
+                kind: TK_IDENT,
+                val: None,
+                str: c.to_string(),
+            };
+            tokens.push_back(token);
+            continue;
         } else if let Some(str) = startwith(
             &chars,
             &mut i,
             // 2文字のトークンを先にチェックする
             vec![
-                "<=", ">=", "==", "!=", "+", "-", "*", "/", "(", ")", "<", ">",
+                "<=", ">=", "==", "!=", "+", "-", "*", "/", "(", ")", "<", ">", ";", "=",
             ],
         ) {
             let token = Token {
