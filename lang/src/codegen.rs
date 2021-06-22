@@ -1,5 +1,5 @@
 use crate::parse::Token;
-use crate::parse::TokenKind::{TK_IDENT, TK_NUM, TK_RESERVED};
+use crate::parse::TokenKind::{TK_IDENT, TK_NUM, TK_RESERVED, TK_RETURN};
 use std::collections::VecDeque;
 
 #[derive(Clone)]
@@ -15,11 +15,10 @@ enum NodeKind {
     ND_NE,
     ND_LT,
     ND_LE,
+    ND_RETURN,
 }
 
-use NodeKind::{
-    ND_ADD, ND_ASSIGN, ND_DIV, ND_EQ, ND_LE, ND_LT, ND_LVAR, ND_MUL, ND_NE, ND_NUM, ND_SUB,
-};
+use NodeKind::*;
 
 #[derive(Clone)]
 pub struct Node {
@@ -60,10 +59,20 @@ fn consume(tokens: &mut VecDeque<Token>, op: &str) -> bool {
 
 fn consume_ident(tokens: &mut VecDeque<Token>) -> Option<Token> {
     if let Some(token) = tokens.front() {
-        match token.kind {
-            TK_IDENT => return tokens.pop_front(),
-            _ => return None,
-        }
+        return match token.kind {
+            TK_IDENT => tokens.pop_front(),
+            _ => None,
+        };
+    }
+    return None;
+}
+
+fn consume_return(tokens: &mut VecDeque<Token>) -> Option<Token> {
+    if let Some(token) = tokens.front() {
+        return match token.kind {
+            TK_RETURN => tokens.pop_front(),
+            _ => None,
+        };
     }
     return None;
 }
@@ -87,14 +96,14 @@ fn expect(tokens: &mut VecDeque<Token>, op: &str) {
 
 fn expect_number(tokens: &mut VecDeque<Token>) -> Result<u32, String> {
     if let Some(token) = tokens.front() {
-        match token.kind {
+        return match token.kind {
             TK_NUM => {
                 let val = token.val.unwrap();
                 tokens.pop_front();
-                return Ok(val);
+                Ok(val)
             }
-            _ => return Err(String::from("数を期待ましたが、数ではありませんでした")),
-        }
+            _ => Err(String::from("数を期待ましたが、数ではありませんでした")),
+        };
     }
     return Err(String::from("二項演算子が文末に来ることはありません"));
 }
@@ -139,9 +148,20 @@ pub fn program(tokens: &mut VecDeque<Token>) -> Vec<Node> {
     return nodes;
 }
 
-// stmt = expr ";"
+// stmt = expr ";" | "return" expr ";"
 fn stmt(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
-    let node: Node = expr(tokens, lvars);
+    let node = if let Some(_token) = consume_return(tokens) {
+        let expr_node = expr(tokens, lvars);
+        Node {
+            kind: ND_RETURN,
+            lhs: Box::new(Some(expr_node)),
+            rhs: Box::new(None),
+            val: None,
+            offset: None,
+        }
+    } else {
+        expr(tokens, lvars)
+    };
     expect(tokens, ";");
     return node;
 }
@@ -238,8 +258,8 @@ fn primary(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
         expect(tokens, ")");
         return node;
     } else if let Some(token) = consume_ident(tokens) {
-        if let Some(lvar) = find_lvar(&token, lvars) {
-            return new_node_lvar(lvar.offset);
+        return if let Some(lvar) = find_lvar(&token, lvars) {
+            new_node_lvar(lvar.offset)
         } else {
             let offset = match lvars.front() {
                 Some(lv) => lv.offset + 8,
@@ -249,8 +269,8 @@ fn primary(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
                 name: token.str,
                 offset,
             });
-            return new_node_lvar(offset);
-        }
+            new_node_lvar(offset)
+        };
     }
     return new_node_num(expect_number(tokens).unwrap());
 }
@@ -271,6 +291,14 @@ fn gen_lval(node: Node) {
 
 pub fn gen(node: Node) {
     match node.kind {
+        ND_RETURN => {
+            gen(node.lhs.unwrap());
+            println!("  pop rax");
+            println!("  mov rsp, rbp");
+            println!("  pop rbp");
+            println!("  ret");
+            return;
+        }
         ND_NUM => {
             println!("  push {}", node.val.unwrap());
             return;
@@ -327,7 +355,7 @@ pub fn gen(node: Node) {
                     println!("  setle al");
                     println!("  movzb rax, al");
                 }
-                ND_NUM | ND_LVAR | ND_ASSIGN => unreachable!(),
+                ND_NUM | ND_LVAR | ND_ASSIGN | ND_RETURN => unreachable!(),
             }
             println!("  push rax");
         }

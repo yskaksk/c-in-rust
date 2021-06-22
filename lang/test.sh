@@ -55,4 +55,6 @@ assert 6 "a=2;b=3;a*b;"
 
 assert 6 "ab=2;cd=3;ab*cd;"
 
+assert 6 "ab=2;cd=3;return ab*cd;"
+
 echo OK

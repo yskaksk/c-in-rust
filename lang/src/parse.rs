@@ -1,16 +1,17 @@
 use std::cmp;
 use std::collections::VecDeque;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum TokenKind {
     TK_RESERVED,
     TK_IDENT,
     TK_NUM,
+    TK_RETURN,
 }
 
-use TokenKind::{TK_IDENT, TK_NUM, TK_RESERVED};
+use TokenKind::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Token {
     pub kind: TokenKind,
     pub val: Option<u32>,
@@ -24,6 +25,13 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
         let c = chars[i];
         if c == ' ' {
             i += 1;
+            continue;
+        } else if startwith_return(&chars, &mut i) {
+            tokens.push_back(Token {
+                kind: TK_RETURN,
+                val: None,
+                str: String::from("return"),
+            });
             continue;
         } else if let Some(str) = startwith_ident(&chars, &mut i) {
             tokens.push_back(Token {
@@ -61,6 +69,20 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
     return tokens;
 }
 
+fn startwith_return(chars: &Vec<char>, ind: &mut usize) -> bool {
+    let i = ind.clone();
+    let sub_chars = &chars[i..cmp::min(i + 6, chars.len())]
+        .iter()
+        .collect::<String>();
+    if sub_chars.to_string() == "return".to_string() {
+        if i + 6 == chars.len() || !chars[i + 6].is_ascii_lowercase() {
+            *ind += 6;
+            return true;
+        }
+    }
+    return false;
+}
+
 fn startwith_ident(chars: &Vec<char>, ind: &mut usize) -> Option<String> {
     let mut i = ind.clone();
     let mut char_vec: Vec<char> = Vec::new();
@@ -90,20 +112,18 @@ fn startwith(chars: &Vec<char>, ind: &mut usize, patterns: Vec<&str>) -> Option<
 }
 
 fn strtol(chars: &Vec<char>, ind: &mut usize) -> Option<u32> {
-    match chars[*ind].to_digit(10) {
-        Some(d) => {
-            *ind += 1;
-            let mut r: u32 = d;
-            while *ind < chars.len() {
-                if let Some(d) = chars[*ind].to_digit(10) {
-                    r = 10 * r + d;
-                    *ind += 1;
-                } else {
-                    break;
-                }
+    if let Some(d) = chars[*ind].to_digit(10) {
+        *ind += 1;
+        let mut r: u32 = d;
+        while *ind < chars.len() {
+            if let Some(d) = chars[*ind].to_digit(10) {
+                r = 10 * r + d;
+                *ind += 1;
+            } else {
+                break;
             }
-            return Some(r);
         }
-        _ => None,
+        return Some(r);
     }
+    return None;
 }
