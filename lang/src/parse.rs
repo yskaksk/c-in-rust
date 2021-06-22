@@ -58,8 +58,9 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
 fn startwith(chars: &Vec<char>, ind: &mut usize, patterns: Vec<&str>) -> Option<String> {
     let i = ind.clone();
     for pat in patterns {
-        let last = cmp::min(i + pat.len(), chars.len());
-        let sub_chars = &chars[i..last].iter().collect::<String>();
+        let sub_chars = &chars[i..cmp::min(i + pat.len(), chars.len())]
+            .iter()
+            .collect::<String>();
         if sub_chars.to_string() == pat.to_string() {
             *ind += sub_chars.len();
             return Some(sub_chars.to_string());
