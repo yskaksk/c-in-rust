@@ -1,4 +1,4 @@
-use crate::parse::TokenKind::{TK_IDENT, TK_IF, TK_NUM, TK_RESERVED, TK_RETURN};
+use crate::parse::TokenKind::{TK_IDENT, TK_IF, TK_NUM, TK_RESERVED, TK_RETURN, TK_WHILE};
 use crate::parse::{Token, TokenKind};
 use std::collections::VecDeque;
 
@@ -52,6 +52,10 @@ pub enum Node {
         cons: Box<Node>,
         alt: Box<Option<Node>>,
     },
+    ND_WHILE {
+        cond: Box<Node>,
+        body: Box<Node>
+    }
 }
 
 use Node::*;
@@ -105,6 +109,12 @@ fn consume_tk(tokens: &mut VecDeque<Token>, tkind: TokenKind) -> Option<Token> {
                     _ => None,
                 }
             }
+            TK_WHILE => {
+                return match token.kind {
+                    TK_WHILE => tokens.pop_front(),
+                    _ => None,
+                }
+            }
             _ => {
                 eprintln!("consume_tkはIDENT/RETURN/IFのみ利用できます");
                 std::process::exit(1);
@@ -113,26 +123,6 @@ fn consume_tk(tokens: &mut VecDeque<Token>, tkind: TokenKind) -> Option<Token> {
     }
     return None;
 }
-
-//fn consume_ident(tokens: &mut VecDeque<Token>) -> Option<Token> {
-//    if let Some(token) = tokens.front() {
-//        return match token.kind {
-//            TK_IDENT => tokens.pop_front(),
-//            _ => None,
-//        };
-//    }
-//    return None;
-//}
-//
-//fn consume_return(tokens: &mut VecDeque<Token>) -> Option<Token> {
-//    if let Some(token) = tokens.front() {
-//        return match token.kind {
-//            TK_RETURN => tokens.pop_front(),
-//            _ => None,
-//        };
-//    }
-//    return None;
-//}
 
 fn expect(tokens: &mut VecDeque<Token>, op: &str) {
     if let Some(token) = tokens.front() {
@@ -198,6 +188,12 @@ fn stmt(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
             Box::new(None)
         };
         ND_IF { cond, cons, alt }
+    } else if let Some(_token) = consume_tk(tokens, TK_WHILE) {
+        expect(tokens, "(");
+        let cond = Box::new(expr(tokens, lvars));
+        expect(tokens, ")");
+        let body = Box::new(stmt(tokens, lvars));
+        ND_WHILE { cond, body }
     } else {
         let nd = expr(tokens, lvars);
         expect(tokens, ";");
@@ -402,6 +398,18 @@ pub fn gen(node: Node, scope_count: &mut u32) {
                 gen(*cons, scope_count);
                 println!(".Lend{}:", sc);
             }
+        }
+        ND_WHILE {cond, body} => {
+            let sc = scope_count.clone();
+            *scope_count += 1;
+            println!(".Lbegin{}:", sc);
+            gen(*cond, scope_count);
+            println!("  pop rax");
+            println!("  cmp rax, 0");
+            println!("  je  .Lend{}", sc);
+            gen(*body, scope_count);
+            println!("  jmp  .Lbegin{}", sc);
+            println!(".Lend{}:", sc);
         }
         ND_NUM(val) => {
             println!("  push {}", val);

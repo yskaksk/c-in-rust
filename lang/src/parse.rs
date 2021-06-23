@@ -8,6 +8,7 @@ pub enum TokenKind {
     TK_NUM,
     TK_RETURN,
     TK_IF,
+    TK_WHILE
 }
 
 use TokenKind::*;
@@ -32,6 +33,13 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
                 kind: TK_RETURN,
                 val: None,
                 str: String::from("return"),
+            });
+            continue;
+        } else if startwith_keyword(&chars, &mut i, "while") {
+            tokens.push_back(Token {
+                kind: TK_WHILE,
+                val: None,
+                str: String::from("while"),
             });
             continue;
         } else if startwith_keyword(&chars, &mut i, "if") {
