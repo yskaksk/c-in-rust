@@ -7,6 +7,7 @@ pub enum TokenKind {
     TK_IDENT,
     TK_NUM,
     TK_RETURN,
+    TK_IF,
 }
 
 use TokenKind::*;
@@ -26,11 +27,25 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
         if c == ' ' {
             i += 1;
             continue;
-        } else if startwith_return(&chars, &mut i) {
+        } else if startwith_keyword(&chars, &mut i, "return") {
             tokens.push_back(Token {
                 kind: TK_RETURN,
                 val: None,
                 str: String::from("return"),
+            });
+            continue;
+        } else if startwith_keyword(&chars, &mut i, "if") {
+            tokens.push_back(Token {
+                kind: TK_IF,
+                val: None,
+                str: String::from("if"),
+            });
+            continue;
+        } else if startwith_keyword(&chars, &mut i, "else") {
+            tokens.push_back(Token {
+                kind: TK_RESERVED,
+                val: None,
+                str: String::from("else"),
             });
             continue;
         } else if let Some(str) = startwith_ident(&chars, &mut i) {
@@ -69,14 +84,29 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
     return tokens;
 }
 
-fn startwith_return(chars: &Vec<char>, ind: &mut usize) -> bool {
+//fn startwith_return(chars: &Vec<char>, ind: &mut usize) -> bool {
+//    let i = ind.clone();
+//    let sub_chars = &chars[i..cmp::min(i + 6, chars.len())]
+//        .iter()
+//        .collect::<String>();
+//    if sub_chars.to_string() == "return".to_string() {
+//        if i + 6 == chars.len() || !chars[i + 6].is_ascii_lowercase() {
+//            *ind += 6;
+//            return true;
+//        }
+//    }
+//    return false;
+//}
+
+fn startwith_keyword(chars: &Vec<char>, ind: &mut usize, keyword: &str) -> bool {
     let i = ind.clone();
-    let sub_chars = &chars[i..cmp::min(i + 6, chars.len())]
+    let klen = keyword.len();
+    let sub_chars = &chars[i..cmp::min(i + klen, chars.len())]
         .iter()
         .collect::<String>();
-    if sub_chars.to_string() == "return".to_string() {
-        if i + 6 == chars.len() || !chars[i + 6].is_ascii_lowercase() {
-            *ind += 6;
+    if sub_chars.to_string() == keyword.to_string() {
+        if i + klen == chars.len() || !chars[i + klen].is_ascii_lowercase() {
+            *ind += klen;
             return true;
         }
     }
