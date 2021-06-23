@@ -3,31 +3,22 @@ use crate::parse::TokenKind::{TK_IDENT, TK_NUM, TK_RESERVED, TK_RETURN};
 use std::collections::VecDeque;
 
 #[derive(Clone)]
-enum NodeKind {
-    ND_ADD,
-    ND_SUB,
-    ND_MUL,
-    ND_DIV,
-    ND_ASSIGN,
-    ND_LVAR,
-    ND_NUM,
-    ND_EQ,
-    ND_NE,
-    ND_LT,
-    ND_LE,
-    ND_RETURN,
+pub enum Node {
+    ND_ADD { lhs: Box<Node>, rhs: Box<Node> },
+    ND_SUB { lhs: Box<Node>, rhs: Box<Node> },
+    ND_MUL { lhs: Box<Node>, rhs: Box<Node> },
+    ND_DIV { lhs: Box<Node>, rhs: Box<Node> },
+    ND_ASSIGN { lhs: Box<Node>, rhs: Box<Node> },
+    ND_LVAR { offset: u32 },
+    ND_NUM(u32),
+    ND_EQ { lhs: Box<Node>, rhs: Box<Node> },
+    ND_NE { lhs: Box<Node>, rhs: Box<Node> },
+    ND_LT { lhs: Box<Node>, rhs: Box<Node> },
+    ND_LE { lhs: Box<Node>, rhs: Box<Node> },
+    ND_RETURN { ret: Box<Node> },
 }
 
-use NodeKind::*;
-
-#[derive(Clone)]
-pub struct Node {
-    kind: NodeKind,
-    lhs: Box<Option<Node>>,
-    rhs: Box<Option<Node>>,
-    val: Option<u32>,
-    offset: Option<u32>,
-}
+use Node::*;
 
 #[derive(Clone)]
 struct LVar {
@@ -108,36 +99,6 @@ fn expect_number(tokens: &mut VecDeque<Token>) -> Result<u32, String> {
     return Err(String::from("二項演算子が文末に来ることはありません"));
 }
 
-fn new_node(kind: NodeKind, lhs: Node, rhs: Node) -> Node {
-    return Node {
-        kind,
-        lhs: Box::new(Some(lhs)),
-        rhs: Box::new(Some(rhs)),
-        val: None,
-        offset: None,
-    };
-}
-
-fn new_node_num(val: u32) -> Node {
-    return Node {
-        kind: ND_NUM,
-        lhs: Box::new(None),
-        rhs: Box::new(None),
-        val: Some(val),
-        offset: None,
-    };
-}
-
-fn new_node_lvar(offset: u32) -> Node {
-    return Node {
-        kind: ND_LVAR,
-        lhs: Box::new(None),
-        rhs: Box::new(None),
-        val: None,
-        offset: Some(offset),
-    };
-}
-
 // program = stmt*
 pub fn program(tokens: &mut VecDeque<Token>) -> Vec<Node> {
     let mut lvars: VecDeque<LVar> = VecDeque::new();
@@ -148,16 +109,16 @@ pub fn program(tokens: &mut VecDeque<Token>) -> Vec<Node> {
     return nodes;
 }
 
-// stmt = expr ";" | "return" expr ";"
+// stmt = expr ";"
+//   | "if" "(" expr ")" stmt ("else" stmt)?
+//   | "while" "(" expr ")" stmt
+//   | "for" "(" expr? ";" expr? ";" expr? ";" ")" stmt
+//   | "return" expr ";"
 fn stmt(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
     let node = if let Some(_token) = consume_return(tokens) {
         let expr_node = expr(tokens, lvars);
-        Node {
-            kind: ND_RETURN,
-            lhs: Box::new(Some(expr_node)),
-            rhs: Box::new(None),
-            val: None,
-            offset: None,
+        ND_RETURN {
+            ret: Box::new(expr_node),
         }
     } else {
         expr(tokens, lvars)
@@ -175,7 +136,10 @@ fn expr(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
 fn assign(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
     let mut node: Node = equality(tokens, lvars);
     if consume(tokens, "=") {
-        node = new_node(ND_ASSIGN, node, assign(tokens, lvars));
+        node = ND_ASSIGN {
+            lhs: Box::new(node),
+            rhs: Box::new(assign(tokens, lvars)),
+        }
     }
     return node;
 }
@@ -185,9 +149,15 @@ fn equality(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
     let mut node: Node = relational(tokens, lvars);
     loop {
         if consume(tokens, "==") {
-            node = new_node(ND_EQ, node.clone(), relational(tokens, lvars));
+            node = ND_EQ {
+                lhs: Box::new(node),
+                rhs: Box::new(relational(tokens, lvars)),
+            }
         } else if consume(tokens, "!=") {
-            node = new_node(ND_NE, node.clone(), relational(tokens, lvars));
+            node = ND_NE {
+                lhs: Box::new(node),
+                rhs: Box::new(relational(tokens, lvars)),
+            }
         } else {
             return node;
         }
@@ -199,13 +169,25 @@ fn relational(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node 
     let mut node: Node = add(tokens, lvars);
     loop {
         if consume(tokens, "<") {
-            node = new_node(ND_LT, node.clone(), add(tokens, lvars));
+            node = ND_LT {
+                lhs: Box::new(node),
+                rhs: Box::new(add(tokens, lvars)),
+            }
         } else if consume(tokens, "<=") {
-            node = new_node(ND_LE, node.clone(), add(tokens, lvars));
+            node = ND_LE {
+                lhs: Box::new(node),
+                rhs: Box::new(add(tokens, lvars)),
+            }
         } else if consume(tokens, ">") {
-            node = new_node(ND_LT, add(tokens, lvars), node.clone());
+            node = ND_LT {
+                lhs: Box::new(add(tokens, lvars)),
+                rhs: Box::new(node),
+            }
         } else if consume(tokens, ">=") {
-            node = new_node(ND_LE, add(tokens, lvars), node.clone());
+            node = ND_LE {
+                lhs: Box::new(add(tokens, lvars)),
+                rhs: Box::new(node),
+            }
         } else {
             return node;
         }
@@ -217,9 +199,15 @@ fn add(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
     let mut node: Node = mul(tokens, lvars);
     loop {
         if consume(tokens, "+") {
-            node = new_node(ND_ADD, node.clone(), mul(tokens, lvars));
+            node = ND_ADD {
+                lhs: Box::new(node),
+                rhs: Box::new(mul(tokens, lvars)),
+            }
         } else if consume(tokens, "-") {
-            node = new_node(ND_SUB, node.clone(), mul(tokens, lvars));
+            node = ND_SUB {
+                lhs: Box::new(node),
+                rhs: Box::new(mul(tokens, lvars)),
+            }
         } else {
             return node;
         }
@@ -231,9 +219,15 @@ fn mul(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
     let mut node: Node = unary(tokens, lvars);
     loop {
         if consume(tokens, "*") {
-            node = new_node(ND_MUL, node.clone(), unary(tokens, lvars));
+            node = ND_MUL {
+                lhs: Box::new(node),
+                rhs: Box::new(unary(tokens, lvars)),
+            }
         } else if consume(tokens, "/") {
-            node = new_node(ND_DIV, node.clone(), unary(tokens, lvars));
+            node = ND_DIV {
+                lhs: Box::new(node),
+                rhs: Box::new(unary(tokens, lvars)),
+            }
         } else {
             return node;
         }
@@ -245,7 +239,10 @@ fn unary(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
     if consume(tokens, "+") {
         return unary(tokens, lvars);
     } else if consume(tokens, "-") {
-        return new_node(ND_SUB, new_node_num(0), unary(tokens, lvars));
+        return ND_SUB {
+            lhs: Box::new(ND_NUM(0)),
+            rhs: Box::new(unary(tokens, lvars)),
+        };
     } else {
         return primary(tokens, lvars);
     }
@@ -259,7 +256,9 @@ fn primary(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
         return node;
     } else if let Some(token) = consume_ident(tokens) {
         return if let Some(lvar) = find_lvar(&token, lvars) {
-            new_node_lvar(lvar.offset)
+            ND_LVAR {
+                offset: lvar.offset,
+            }
         } else {
             let offset = match lvars.front() {
                 Some(lv) => lv.offset + 8,
@@ -269,17 +268,17 @@ fn primary(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
                 name: token.str,
                 offset,
             });
-            new_node_lvar(offset)
+            ND_LVAR { offset }
         };
     }
-    return new_node_num(expect_number(tokens).unwrap());
+    return ND_NUM(expect_number(tokens).unwrap());
 }
 
 fn gen_lval(node: Node) {
-    match node.kind {
-        ND_LVAR => {
+    match node {
+        ND_LVAR { offset } => {
             println!("  mov rax, rbp");
-            println!("  sub rax, {}", node.offset.unwrap());
+            println!("  sub rax, {}", offset);
             println!("  push rax");
         }
         _ => {
@@ -289,74 +288,88 @@ fn gen_lval(node: Node) {
     }
 }
 
+fn gen_bin_op(lhs: Node, rhs: Node) {
+    gen(lhs);
+    gen(rhs);
+
+    println!("  pop rdi");
+    println!("  pop rax");
+}
+
 pub fn gen(node: Node) {
-    match node.kind {
-        ND_RETURN => {
-            gen(node.lhs.unwrap());
+    match node {
+        ND_RETURN { ret } => {
+            gen(*ret);
             println!("  pop rax");
             println!("  mov rsp, rbp");
             println!("  pop rbp");
             println!("  ret");
-            return;
         }
-        ND_NUM => {
-            println!("  push {}", node.val.unwrap());
-            return;
+        ND_NUM(val) => {
+            println!("  push {}", val);
         }
-        ND_LVAR => {
+        ND_LVAR { offset: _ } => {
             gen_lval(node);
             println!("  pop rax");
             println!("  mov rax, [rax]");
             println!("  push rax");
-            return;
         }
-        ND_ASSIGN => {
-            gen_lval(node.lhs.unwrap());
-            gen(node.rhs.unwrap());
+        ND_ASSIGN { lhs, rhs } => {
+            gen_lval(*lhs);
+            gen(*rhs);
 
             println!("  pop rdi");
             println!("  pop rax");
             println!("  mov [rax], rdi");
             println!("  push rdi");
-            return;
         }
-        _ => {
-            gen(node.lhs.unwrap());
-            gen(node.rhs.unwrap());
-
-            println!("  pop rdi");
-            println!("  pop rax");
-
-            match node.kind {
-                ND_ADD => println!("  add rax, rdi"),
-                ND_SUB => println!("  sub rax, rdi"),
-                ND_MUL => println!("  imul rax, rdi"),
-                ND_DIV => {
-                    println!("  cqo");
-                    println!("  idiv rdi");
-                }
-                ND_EQ => {
-                    println!("  cmp rax, rdi");
-                    println!("  sete al");
-                    println!("  movzb rax, al");
-                }
-                ND_NE => {
-                    println!("  cmp rax, rdi");
-                    println!("  setne al");
-                    println!("  movzb rax, al");
-                }
-                ND_LT => {
-                    println!("  cmp rax, rdi");
-                    println!("  setl al");
-                    println!("  movzb rax, al");
-                }
-                ND_LE => {
-                    println!("  cmp rax, rdi");
-                    println!("  setle al");
-                    println!("  movzb rax, al");
-                }
-                ND_NUM | ND_LVAR | ND_ASSIGN | ND_RETURN => unreachable!(),
-            }
+        ND_ADD { lhs, rhs } => {
+            gen_bin_op(*lhs, *rhs);
+            println!("  add rax, rdi");
+            println!("  push rax");
+        }
+        ND_SUB { lhs, rhs } => {
+            gen_bin_op(*lhs, *rhs);
+            println!("  sub rax, rdi");
+            println!("  push rax");
+        }
+        ND_MUL { lhs, rhs } => {
+            gen_bin_op(*lhs, *rhs);
+            println!("  imul rax, rdi");
+            println!("  push rax");
+        }
+        ND_DIV { lhs, rhs } => {
+            gen_bin_op(*lhs, *rhs);
+            println!("  cqo");
+            println!("  idiv rdi");
+            println!("  push rax");
+        }
+        ND_EQ { lhs, rhs } => {
+            gen_bin_op(*lhs, *rhs);
+            println!("  cmp rax, rdi");
+            println!("  sete al");
+            println!("  movzb rax, al");
+            println!("  push rax");
+        }
+        ND_NE { lhs, rhs } => {
+            gen_bin_op(*lhs, *rhs);
+            println!("  cmp rax, rdi");
+            println!("  setne al");
+            println!("  movzb rax, al");
+            println!("  push rax");
+        }
+        ND_LT { lhs, rhs } => {
+            gen_bin_op(*lhs, *rhs);
+            println!("  cmp rax, rdi");
+            println!("  setl al");
+            println!("  movzb rax, al");
+            println!("  push rax");
+        }
+        ND_LE { lhs, rhs } => {
+            gen_bin_op(*lhs, *rhs);
+            println!("  cmp rax, rdi");
+            println!("  setle al");
+            println!("  movzb rax, al");
             println!("  push rax");
         }
     }
