@@ -1,21 +1,57 @@
-use crate::parse::Token;
-use crate::parse::TokenKind::{TK_IDENT, TK_NUM, TK_RESERVED, TK_RETURN};
+use crate::parse::TokenKind::{TK_IDENT, TK_IF, TK_NUM, TK_RESERVED, TK_RETURN};
+use crate::parse::{Token, TokenKind};
 use std::collections::VecDeque;
 
 #[derive(Clone)]
 pub enum Node {
-    ND_ADD { lhs: Box<Node>, rhs: Box<Node> },
-    ND_SUB { lhs: Box<Node>, rhs: Box<Node> },
-    ND_MUL { lhs: Box<Node>, rhs: Box<Node> },
-    ND_DIV { lhs: Box<Node>, rhs: Box<Node> },
-    ND_ASSIGN { lhs: Box<Node>, rhs: Box<Node> },
-    ND_LVAR { offset: u32 },
+    ND_ADD {
+        lhs: Box<Node>,
+        rhs: Box<Node>,
+    },
+    ND_SUB {
+        lhs: Box<Node>,
+        rhs: Box<Node>,
+    },
+    ND_MUL {
+        lhs: Box<Node>,
+        rhs: Box<Node>,
+    },
+    ND_DIV {
+        lhs: Box<Node>,
+        rhs: Box<Node>,
+    },
+    ND_ASSIGN {
+        lhs: Box<Node>,
+        rhs: Box<Node>,
+    },
+    ND_LVAR {
+        offset: u32,
+    },
     ND_NUM(u32),
-    ND_EQ { lhs: Box<Node>, rhs: Box<Node> },
-    ND_NE { lhs: Box<Node>, rhs: Box<Node> },
-    ND_LT { lhs: Box<Node>, rhs: Box<Node> },
-    ND_LE { lhs: Box<Node>, rhs: Box<Node> },
-    ND_RETURN { ret: Box<Node> },
+    ND_EQ {
+        lhs: Box<Node>,
+        rhs: Box<Node>,
+    },
+    ND_NE {
+        lhs: Box<Node>,
+        rhs: Box<Node>,
+    },
+    ND_LT {
+        lhs: Box<Node>,
+        rhs: Box<Node>,
+    },
+    ND_LE {
+        lhs: Box<Node>,
+        rhs: Box<Node>,
+    },
+    ND_RETURN {
+        ret: Box<Node>,
+    },
+    ND_IF {
+        cond: Box<Node>,
+        cons: Box<Node>,
+        alt: Box<Option<Node>>,
+    },
 }
 
 use Node::*;
@@ -48,25 +84,55 @@ fn consume(tokens: &mut VecDeque<Token>, op: &str) -> bool {
     return false;
 }
 
-fn consume_ident(tokens: &mut VecDeque<Token>) -> Option<Token> {
+fn consume_tk(tokens: &mut VecDeque<Token>, tkind: TokenKind) -> Option<Token> {
     if let Some(token) = tokens.front() {
-        return match token.kind {
-            TK_IDENT => tokens.pop_front(),
-            _ => None,
-        };
+        match tkind {
+            TK_IDENT => {
+                return match token.kind {
+                    TK_IDENT => tokens.pop_front(),
+                    _ => None,
+                }
+            }
+            TK_RETURN => {
+                return match token.kind {
+                    TK_RETURN => tokens.pop_front(),
+                    _ => None,
+                }
+            }
+            TK_IF => {
+                return match token.kind {
+                    TK_IF => tokens.pop_front(),
+                    _ => None,
+                }
+            }
+            _ => {
+                eprintln!("consume_tkはIDENT/RETURN/IFのみ利用できます");
+                std::process::exit(1);
+            }
+        }
     }
     return None;
 }
 
-fn consume_return(tokens: &mut VecDeque<Token>) -> Option<Token> {
-    if let Some(token) = tokens.front() {
-        return match token.kind {
-            TK_RETURN => tokens.pop_front(),
-            _ => None,
-        };
-    }
-    return None;
-}
+//fn consume_ident(tokens: &mut VecDeque<Token>) -> Option<Token> {
+//    if let Some(token) = tokens.front() {
+//        return match token.kind {
+//            TK_IDENT => tokens.pop_front(),
+//            _ => None,
+//        };
+//    }
+//    return None;
+//}
+//
+//fn consume_return(tokens: &mut VecDeque<Token>) -> Option<Token> {
+//    if let Some(token) = tokens.front() {
+//        return match token.kind {
+//            TK_RETURN => tokens.pop_front(),
+//            _ => None,
+//        };
+//    }
+//    return None;
+//}
 
 fn expect(tokens: &mut VecDeque<Token>, op: &str) {
     if let Some(token) = tokens.front() {
@@ -115,15 +181,28 @@ pub fn program(tokens: &mut VecDeque<Token>) -> Vec<Node> {
 //   | "for" "(" expr? ";" expr? ";" expr? ";" ")" stmt
 //   | "return" expr ";"
 fn stmt(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
-    let node = if let Some(_token) = consume_return(tokens) {
+    let node = if let Some(_token) = consume_tk(tokens, TK_RETURN) {
         let expr_node = expr(tokens, lvars);
+        expect(tokens, ";");
         ND_RETURN {
             ret: Box::new(expr_node),
         }
+    } else if let Some(_token) = consume_tk(tokens, TK_IF) {
+        expect(tokens, "(");
+        let cond = Box::new(expr(tokens, lvars));
+        expect(tokens, ")");
+        let cons = Box::new(stmt(tokens, lvars));
+        let alt = if consume(tokens, "else") {
+            Box::new(Some(stmt(tokens, lvars)))
+        } else {
+            Box::new(None)
+        };
+        ND_IF { cond, cons, alt }
     } else {
-        expr(tokens, lvars)
+        let nd = expr(tokens, lvars);
+        expect(tokens, ";");
+        nd
     };
-    expect(tokens, ";");
     return node;
 }
 
@@ -254,7 +333,7 @@ fn primary(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
         let node = expr(tokens, lvars);
         expect(tokens, ")");
         return node;
-    } else if let Some(token) = consume_ident(tokens) {
+    } else if let Some(token) = consume_tk(tokens, TK_IDENT) {
         return if let Some(lvar) = find_lvar(&token, lvars) {
             ND_LVAR {
                 offset: lvar.offset,
@@ -288,22 +367,41 @@ fn gen_lval(node: Node) {
     }
 }
 
-fn gen_bin_op(lhs: Node, rhs: Node) {
-    gen(lhs);
-    gen(rhs);
+fn gen_bin_op(lhs: Node, rhs: Node, scope_count: &mut u32) {
+    gen(lhs, scope_count);
+    gen(rhs, scope_count);
 
     println!("  pop rdi");
     println!("  pop rax");
 }
 
-pub fn gen(node: Node) {
+pub fn gen(node: Node, scope_count: &mut u32) {
     match node {
         ND_RETURN { ret } => {
-            gen(*ret);
+            gen(*ret, scope_count);
             println!("  pop rax");
             println!("  mov rsp, rbp");
             println!("  pop rbp");
             println!("  ret");
+        }
+        ND_IF { cond, cons, alt } => {
+            gen(*cond, scope_count);
+            println!("  pop rax");
+            println!("  cmp rax, 0");
+            let sc = scope_count.clone();
+            *scope_count += 1;
+            if let Some(alt_node) = *alt {
+                println!("  je  .Lelse{}", sc);
+                gen(*cons, scope_count);
+                println!("  jmp .Lend{}", sc);
+                println!(".Lelse{}:", sc);
+                gen(alt_node, scope_count);
+                println!(".Lend{}:", sc);
+            } else {
+                println!("  je  .Lend{}", sc);
+                gen(*cons, scope_count);
+                println!(".Lend{}:", sc);
+            }
         }
         ND_NUM(val) => {
             println!("  push {}", val);
@@ -316,7 +414,7 @@ pub fn gen(node: Node) {
         }
         ND_ASSIGN { lhs, rhs } => {
             gen_lval(*lhs);
-            gen(*rhs);
+            gen(*rhs, scope_count);
 
             println!("  pop rdi");
             println!("  pop rax");
@@ -324,49 +422,49 @@ pub fn gen(node: Node) {
             println!("  push rdi");
         }
         ND_ADD { lhs, rhs } => {
-            gen_bin_op(*lhs, *rhs);
+            gen_bin_op(*lhs, *rhs, scope_count);
             println!("  add rax, rdi");
             println!("  push rax");
         }
         ND_SUB { lhs, rhs } => {
-            gen_bin_op(*lhs, *rhs);
+            gen_bin_op(*lhs, *rhs, scope_count);
             println!("  sub rax, rdi");
             println!("  push rax");
         }
         ND_MUL { lhs, rhs } => {
-            gen_bin_op(*lhs, *rhs);
+            gen_bin_op(*lhs, *rhs, scope_count);
             println!("  imul rax, rdi");
             println!("  push rax");
         }
         ND_DIV { lhs, rhs } => {
-            gen_bin_op(*lhs, *rhs);
+            gen_bin_op(*lhs, *rhs, scope_count);
             println!("  cqo");
             println!("  idiv rdi");
             println!("  push rax");
         }
         ND_EQ { lhs, rhs } => {
-            gen_bin_op(*lhs, *rhs);
+            gen_bin_op(*lhs, *rhs, scope_count);
             println!("  cmp rax, rdi");
             println!("  sete al");
             println!("  movzb rax, al");
             println!("  push rax");
         }
         ND_NE { lhs, rhs } => {
-            gen_bin_op(*lhs, *rhs);
+            gen_bin_op(*lhs, *rhs, scope_count);
             println!("  cmp rax, rdi");
             println!("  setne al");
             println!("  movzb rax, al");
             println!("  push rax");
         }
         ND_LT { lhs, rhs } => {
-            gen_bin_op(*lhs, *rhs);
+            gen_bin_op(*lhs, *rhs, scope_count);
             println!("  cmp rax, rdi");
             println!("  setl al");
             println!("  movzb rax, al");
             println!("  push rax");
         }
         ND_LE { lhs, rhs } => {
-            gen_bin_op(*lhs, *rhs);
+            gen_bin_op(*lhs, *rhs, scope_count);
             println!("  cmp rax, rdi");
             println!("  setle al");
             println!("  movzb rax, al");

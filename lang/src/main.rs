@@ -23,8 +23,9 @@ fn main() {
     println!("  mov rbp, rsp");
     println!("  sub rsp, 208");
 
+    let mut scope_count = 0;
     for node in nodes {
-        gen(node);
+        gen(node, &mut scope_count);
         println!("  pop rax");
     }
 

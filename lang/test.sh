@@ -56,5 +56,7 @@ assert 6 "a=2;b=3;a*b;"
 assert 6 "ab=2;cd=3;ab*cd;"
 
 assert 6 "ab=2;cd=3;return ab*cd;"
+assert 1 "a=1;if (a==1) return a;"
+assert 2 "a=1;b=2;if (a!=1) return a; else return b;"
 
 echo OK
