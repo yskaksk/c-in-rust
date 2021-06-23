@@ -59,4 +59,6 @@ assert 6 "ab=2;cd=3;return ab*cd;"
 assert 1 "a=1;if (a==1) return a;"
 assert 2 "a=1;b=2;if (a!=1) return a; else return b;"
 
+assert 16 "a=1;while (a<10) a=a*2; return a;"
+
 echo OK
