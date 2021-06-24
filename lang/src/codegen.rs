@@ -1,4 +1,4 @@
-use crate::parse::TokenKind::{TK_IDENT, TK_IF, TK_NUM, TK_RESERVED, TK_RETURN, TK_WHILE};
+use crate::parse::TokenKind::{TK_FOR, TK_IDENT, TK_IF, TK_NUM, TK_RESERVED, TK_RETURN, TK_WHILE};
 use crate::parse::{Token, TokenKind};
 use std::collections::VecDeque;
 
@@ -54,8 +54,14 @@ pub enum Node {
     },
     ND_WHILE {
         cond: Box<Node>,
-        body: Box<Node>
-    }
+        body: Box<Node>,
+    },
+    ND_FOR {
+        init: Box<Option<Node>>,
+        cond: Box<Option<Node>>,
+        inc: Box<Option<Node>>,
+        body: Box<Node>,
+    },
 }
 
 use Node::*;
@@ -90,35 +96,8 @@ fn consume(tokens: &mut VecDeque<Token>, op: &str) -> bool {
 
 fn consume_tk(tokens: &mut VecDeque<Token>, tkind: TokenKind) -> Option<Token> {
     if let Some(token) = tokens.front() {
-        match tkind {
-            TK_IDENT => {
-                return match token.kind {
-                    TK_IDENT => tokens.pop_front(),
-                    _ => None,
-                }
-            }
-            TK_RETURN => {
-                return match token.kind {
-                    TK_RETURN => tokens.pop_front(),
-                    _ => None,
-                }
-            }
-            TK_IF => {
-                return match token.kind {
-                    TK_IF => tokens.pop_front(),
-                    _ => None,
-                }
-            }
-            TK_WHILE => {
-                return match token.kind {
-                    TK_WHILE => tokens.pop_front(),
-                    _ => None,
-                }
-            }
-            _ => {
-                eprintln!("consume_tkはIDENT/RETURN/IFのみ利用できます");
-                std::process::exit(1);
-            }
+        if token.kind == tkind {
+            return tokens.pop_front();
         }
     }
     return None;
@@ -194,6 +173,37 @@ fn stmt(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
         expect(tokens, ")");
         let body = Box::new(stmt(tokens, lvars));
         ND_WHILE { cond, body }
+    } else if let Some(_token) = consume_tk(tokens, TK_FOR) {
+        expect(tokens, "(");
+        let init = Box::new(if consume(tokens, ";") {
+            None
+        } else {
+            let nd = expr(tokens, lvars);
+            expect(tokens, ";");
+            Some(nd)
+        });
+        let cond = Box::new(if consume(tokens, ";") {
+            None
+        } else {
+            let nd = expr(tokens, lvars);
+            expect(tokens, ";");
+            Some(nd)
+        });
+        let inc = Box::new(if consume(tokens, ";") {
+            None
+        } else {
+            let nd = expr(tokens, lvars);
+            expect(tokens, ";");
+            Some(nd)
+        });
+        expect(tokens, ")");
+        let body = Box::new(stmt(tokens, lvars));
+        ND_FOR {
+            init,
+            cond,
+            inc,
+            body,
+        }
     } else {
         let nd = expr(tokens, lvars);
         expect(tokens, ";");
@@ -399,7 +409,32 @@ pub fn gen(node: Node, scope_count: &mut u32) {
                 println!(".Lend{}:", sc);
             }
         }
-        ND_WHILE {cond, body} => {
+        ND_FOR {
+            init,
+            cond,
+            inc,
+            body,
+        } => {
+            let sc = scope_count.clone();
+            *scope_count += 1;
+            if let Some(tk) = *init {
+                gen(tk, scope_count);
+            }
+            println!(".Lbegin{}:", sc);
+            if let Some(tk) = *cond {
+                gen(tk, scope_count);
+            }
+            println!("  pop rax");
+            println!("  cmp rax, 0");
+            println!("  je  .Lend{}", sc);
+            gen(*body, scope_count);
+            if let Some(tk) = *inc {
+                gen(tk, scope_count);
+            }
+            println!("  jmp  .Lbegin{}", sc);
+            println!(".Lend{}:", sc);
+        }
+        ND_WHILE { cond, body } => {
             let sc = scope_count.clone();
             *scope_count += 1;
             println!(".Lbegin{}:", sc);
