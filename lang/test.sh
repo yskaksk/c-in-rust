@@ -62,4 +62,6 @@ assert 2 "a=1;b=2;if (a!=1) return a; else return b;"
 assert 16 "a=1;while (a<10) a=a*2; return a;"
 assert 8 "a=1;for(c=0;c<3;c=c+1;)a=a*2;return a;"
 
+assert 8 "a=0;b=1;while(a<3){a=a+1;b=b*2;}return b;"
+
 echo OK
