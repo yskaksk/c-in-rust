@@ -55,6 +55,9 @@ pub enum Node {
     ND_WHILE {
         cond: Box<Node>,
         body: Box<Node>
+    },
+    ND_BLOCK {
+        stmts: Vec<Node>
     }
 }
 
@@ -166,6 +169,7 @@ pub fn program(tokens: &mut VecDeque<Token>) -> Vec<Node> {
 }
 
 // stmt = expr ";"
+//   | "{" stmt* "}"
 //   | "if" "(" expr ")" stmt ("else" stmt)?
 //   | "while" "(" expr ")" stmt
 //   | "for" "(" expr? ";" expr? ";" expr? ";" ")" stmt
@@ -194,6 +198,12 @@ fn stmt(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
         expect(tokens, ")");
         let body = Box::new(stmt(tokens, lvars));
         ND_WHILE { cond, body }
+    } else if consume(tokens, "{") {
+        let mut stmts: Vec<Node> = Vec::new();
+        while !consume(tokens, "}") {
+            stmts.push(stmt(tokens, lvars));
+        }
+        ND_BLOCK { stmts }
     } else {
         let nd = expr(tokens, lvars);
         expect(tokens, ";");
@@ -379,6 +389,12 @@ pub fn gen(node: Node, scope_count: &mut u32) {
             println!("  mov rsp, rbp");
             println!("  pop rbp");
             println!("  ret");
+        }
+        ND_BLOCK { stmts } => {
+            for stm in stmts {
+                gen(stm, scope_count);
+                println!("  pop rax");
+            }
         }
         ND_IF { cond, cons, alt } => {
             gen(*cond, scope_count);
