@@ -1,14 +1,15 @@
 use std::cmp;
 use std::collections::VecDeque;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum TokenKind {
     TK_RESERVED,
     TK_IDENT,
     TK_NUM,
     TK_RETURN,
     TK_IF,
-    TK_WHILE
+    TK_WHILE,
+    TK_FOR,
 }
 
 use TokenKind::*;
@@ -33,6 +34,13 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
                 kind: TK_RETURN,
                 val: None,
                 str: String::from("return"),
+            });
+            continue;
+        } else if startwith_keyword(&chars, &mut i, "for") {
+            tokens.push_back(Token {
+                kind: TK_FOR,
+                val: None,
+                str: String::from("for"),
             });
             continue;
         } else if startwith_keyword(&chars, &mut i, "while") {
@@ -91,20 +99,6 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
     }
     return tokens;
 }
-
-//fn startwith_return(chars: &Vec<char>, ind: &mut usize) -> bool {
-//    let i = ind.clone();
-//    let sub_chars = &chars[i..cmp::min(i + 6, chars.len())]
-//        .iter()
-//        .collect::<String>();
-//    if sub_chars.to_string() == "return".to_string() {
-//        if i + 6 == chars.len() || !chars[i + 6].is_ascii_lowercase() {
-//            *ind += 6;
-//            return true;
-//        }
-//    }
-//    return false;
-//}
 
 fn startwith_keyword(chars: &Vec<char>, ind: &mut usize, keyword: &str) -> bool {
     let i = ind.clone();
