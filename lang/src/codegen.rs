@@ -66,10 +66,9 @@ pub enum Node {
         inc: Box<Node>,
         body: Box<Node>,
     },
-    //ND_FUNCTION {
-    //    args: Box<Node>,
-    //    body: Box<Node>
-    //}
+    ND_FUNCTION {
+        name: String,
+    },
 }
 
 use Node::*;
@@ -355,21 +354,26 @@ fn primary(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
         expect(tokens, ")");
         return node;
     } else if let Some(token) = consume_tk(tokens, TK_IDENT) {
-        return if let Some(lvar) = find_lvar(&token, lvars) {
-            ND_LVAR {
-                offset: lvar.offset,
-            }
+        if consume(tokens, "(") {
+            expect(tokens, ")");
+            return ND_FUNCTION { name: token.str };
         } else {
-            let offset = match lvars.front() {
-                Some(lv) => lv.offset + 8,
-                None => 0,
+            return if let Some(lvar) = find_lvar(&token, lvars) {
+                ND_LVAR {
+                    offset: lvar.offset,
+                }
+            } else {
+                let offset = match lvars.front() {
+                    Some(lv) => lv.offset + 8,
+                    None => 0,
+                };
+                lvars.push_front(LVar {
+                    name: token.str,
+                    offset,
+                });
+                ND_LVAR { offset }
             };
-            lvars.push_front(LVar {
-                name: token.str,
-                offset,
-            });
-            ND_LVAR { offset }
-        };
+        }
     }
     return ND_NUM(expect_number(tokens).unwrap());
 }
@@ -405,6 +409,10 @@ pub fn gen(node: Node, scope_count: &mut u32) {
             println!("  mov rsp, rbp");
             println!("  pop rbp");
             println!("  ret");
+        }
+        ND_FUNCTION { name } => {
+            println!("  call {}", name);
+            println!("  push rax");
         }
         ND_BLOCK { stmts } => {
             for stm in stmts {

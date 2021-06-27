@@ -118,12 +118,15 @@ fn startwith_keyword(chars: &Vec<char>, ind: &mut usize, keyword: &str) -> bool 
 fn startwith_ident(chars: &Vec<char>, ind: &mut usize) -> Option<String> {
     let mut i = ind.clone();
     let mut char_vec: Vec<char> = Vec::new();
-    while chars[i].is_ascii_lowercase() {
+    if chars[i].is_ascii_lowercase() {
         char_vec.push(chars[i]);
         i += 1;
-    }
-    if char_vec.is_empty() {
+    } else {
         return None;
+    }
+    while chars[i].is_ascii_lowercase() || chars[i].is_digit(10) {
+        char_vec.push(chars[i]);
+        i += 1;
     }
     *ind += char_vec.len();
     return Some(char_vec.iter().collect());
