@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 
 #[derive(Clone)]
 pub enum Node {
+    ND_NOTHING,
     ND_ADD {
         lhs: Box<Node>,
         rhs: Box<Node>,
@@ -50,21 +51,25 @@ pub enum Node {
     ND_IF {
         cond: Box<Node>,
         cons: Box<Node>,
-        alt: Box<Option<Node>>,
+        alt: Box<Node>,
     },
     ND_WHILE {
         cond: Box<Node>,
-        body: Box<Node>
-    },
-    ND_BLOCK {
-        stmts: Vec<Node>
-    },
-    ND_FOR {
-        init: Box<Option<Node>>,
-        cond: Box<Option<Node>>,
-        inc: Box<Option<Node>>,
         body: Box<Node>,
     },
+    ND_BLOCK {
+        stmts: Vec<Node>,
+    },
+    ND_FOR {
+        init: Box<Node>,
+        cond: Box<Node>,
+        inc: Box<Node>,
+        body: Box<Node>,
+    },
+    //ND_FUNCTION {
+    //    args: Box<Node>,
+    //    body: Box<Node>
+    //}
 }
 
 use Node::*;
@@ -165,11 +170,11 @@ fn stmt(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
         let cond = Box::new(expr(tokens, lvars));
         expect(tokens, ")");
         let cons = Box::new(stmt(tokens, lvars));
-        let alt = if consume(tokens, "else") {
-            Box::new(Some(stmt(tokens, lvars)))
+        let alt = Box::new(if consume(tokens, "else") {
+            stmt(tokens, lvars)
         } else {
-            Box::new(None)
-        };
+            ND_NOTHING
+        });
         ND_IF { cond, cons, alt }
     } else if let Some(_token) = consume_tk(tokens, TK_WHILE) {
         expect(tokens, "(");
@@ -186,25 +191,25 @@ fn stmt(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
     } else if let Some(_token) = consume_tk(tokens, TK_FOR) {
         expect(tokens, "(");
         let init = Box::new(if consume(tokens, ";") {
-            None
+            ND_NOTHING
         } else {
             let nd = expr(tokens, lvars);
             expect(tokens, ";");
-            Some(nd)
+            nd
         });
         let cond = Box::new(if consume(tokens, ";") {
-            None
+            ND_NOTHING
         } else {
             let nd = expr(tokens, lvars);
             expect(tokens, ";");
-            Some(nd)
+            nd
         });
         let inc = Box::new(if consume(tokens, ";") {
-            None
+            ND_NOTHING
         } else {
             let nd = expr(tokens, lvars);
             expect(tokens, ";");
-            Some(nd)
+            nd
         });
         expect(tokens, ")");
         let body = Box::new(stmt(tokens, lvars));
@@ -343,7 +348,7 @@ fn unary(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
     }
 }
 
-// primary    = num | ident | "(" expr ")"
+// primary    = num | ident ("(" ")")? | "(" expr ")"
 fn primary(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
     if consume(tokens, "(") {
         let node = expr(tokens, lvars);
@@ -393,6 +398,7 @@ fn gen_bin_op(lhs: Node, rhs: Node, scope_count: &mut u32) {
 
 pub fn gen(node: Node, scope_count: &mut u32) {
     match node {
+        ND_NOTHING => {}
         ND_RETURN { ret } => {
             gen(*ret, scope_count);
             println!("  pop rax");
@@ -407,23 +413,17 @@ pub fn gen(node: Node, scope_count: &mut u32) {
             }
         }
         ND_IF { cond, cons, alt } => {
+            let sc = scope_count.clone();
+            *scope_count += 1;
             gen(*cond, scope_count);
             println!("  pop rax");
             println!("  cmp rax, 0");
-            let sc = scope_count.clone();
-            *scope_count += 1;
-            if let Some(alt_node) = *alt {
-                println!("  je  .Lelse{}", sc);
-                gen(*cons, scope_count);
-                println!("  jmp .Lend{}", sc);
-                println!(".Lelse{}:", sc);
-                gen(alt_node, scope_count);
-                println!(".Lend{}:", sc);
-            } else {
-                println!("  je  .Lend{}", sc);
-                gen(*cons, scope_count);
-                println!(".Lend{}:", sc);
-            }
+            println!("  je  .Lelse{}", sc);
+            gen(*cons, scope_count);
+            println!("  jmp .Lend{}", sc);
+            println!(".Lelse{}:", sc);
+            gen(*alt, scope_count);
+            println!(".Lend{}:", sc);
         }
         ND_FOR {
             init,
@@ -433,20 +433,14 @@ pub fn gen(node: Node, scope_count: &mut u32) {
         } => {
             let sc = scope_count.clone();
             *scope_count += 1;
-            if let Some(tk) = *init {
-                gen(tk, scope_count);
-            }
+            gen(*init, scope_count);
             println!(".Lbegin{}:", sc);
-            if let Some(tk) = *cond {
-                gen(tk, scope_count);
-            }
+            gen(*cond, scope_count);
             println!("  pop rax");
             println!("  cmp rax, 0");
             println!("  je  .Lend{}", sc);
             gen(*body, scope_count);
-            if let Some(tk) = *inc {
-                gen(tk, scope_count);
-            }
+            gen(*inc, scope_count);
             println!("  jmp  .Lbegin{}", sc);
             println!(".Lend{}:", sc);
         }
