@@ -77,6 +77,7 @@ pub fn tokenize(chars: Vec<char>) -> VecDeque<Token> {
             // 2文字のトークンを先にチェックする
             vec![
                 "<=", ">=", "==", "!=", "+", "-", "*", "/", "(", ")", "<", ">", ";", "=", "{", "}",
+                ",",
             ],
         ) {
             tokens.push_back(Token {
