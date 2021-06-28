@@ -66,8 +66,9 @@ pub enum Node {
         inc: Box<Node>,
         body: Box<Node>,
     },
-    ND_FUNCTION {
+    ND_FUNCALL {
         name: String,
+        args: Vec<Node>,
     },
 }
 
@@ -347,7 +348,20 @@ fn unary(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
     }
 }
 
-// primary    = num | ident ("(" ")")? | "(" expr ")"
+// func-args = "(" (assign ("," assign)*)? ")"
+fn func_args(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Vec<Node> {
+    if consume(tokens, ")") {
+        return Vec::new();
+    }
+    let mut args: Vec<Node> = vec![assign(tokens, lvars)];
+    while consume(tokens, ",") {
+        args.push(assign(tokens, lvars));
+    }
+    expect(tokens, ")");
+    return args;
+}
+
+// primary    = num | ident func-args? | "(" expr ")"
 fn primary(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
     if consume(tokens, "(") {
         let node = expr(tokens, lvars);
@@ -355,8 +369,12 @@ fn primary(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
         return node;
     } else if let Some(token) = consume_tk(tokens, TK_IDENT) {
         if consume(tokens, "(") {
-            expect(tokens, ")");
-            return ND_FUNCTION { name: token.str };
+            let args = func_args(tokens, lvars);
+            //expect(tokens, ")");
+            return ND_FUNCALL {
+                name: token.str,
+                args,
+            };
         } else {
             return if let Some(lvar) = find_lvar(&token, lvars) {
                 ND_LVAR {
@@ -401,6 +419,7 @@ fn gen_bin_op(lhs: Node, rhs: Node, scope_count: &mut u32) {
 }
 
 pub fn gen(node: Node, scope_count: &mut u32) {
+    let argreg = vec!["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
     match node {
         ND_NOTHING => {}
         ND_RETURN { ret } => {
@@ -410,7 +429,15 @@ pub fn gen(node: Node, scope_count: &mut u32) {
             println!("  pop rbp");
             println!("  ret");
         }
-        ND_FUNCTION { name } => {
+        ND_FUNCALL { name, args } => {
+            let mut nargs = 0;
+            for arg in args {
+                gen(arg, scope_count);
+                nargs += 1;
+            }
+            for i in (0..nargs).rev() {
+                println!("  pop {}", argreg[i]);
+            }
             println!("  call {}", name);
             println!("  push rax");
         }
