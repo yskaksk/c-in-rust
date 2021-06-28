@@ -66,14 +66,9 @@ pub enum Node {
         inc: Box<Node>,
         body: Box<Node>,
     },
-<<<<<<< HEAD
     ND_FUNCALL {
         name: String,
         args: Vec<Node>,
-=======
-    ND_FUNCTION {
-        name: String,
->>>>>>> main
     },
 }
 
@@ -433,7 +428,6 @@ pub fn gen(node: Node, scope_count: &mut u32) {
             println!("  pop rbp");
             println!("  ret");
         }
-<<<<<<< HEAD
         ND_FUNCALL { name, args } => {
             let mut nargs = 0;
             for arg in args {
@@ -443,9 +437,6 @@ pub fn gen(node: Node, scope_count: &mut u32) {
             for i in (0..nargs).rev() {
                 println!("  pop {}", argreg[i]);
             }
-=======
-        ND_FUNCTION { name } => {
->>>>>>> main
             println!("  call {}", name);
             println!("  push rax");
         }
