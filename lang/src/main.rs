@@ -1,8 +1,8 @@
 use std::env;
 
 use lang::codegen::gen;
-use lang::codegen::program;
-use lang::parse::tokenize;
+use lang::parse::program;
+use lang::tokenize::tokenize;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
