@@ -26,6 +26,7 @@ fn gen_bin_op(lhs: Node, rhs: Node, scope_count: &mut u32) {
 pub fn gen(node: Node, scope_count: &mut u32) {
     let argreg = vec!["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
     match node {
+        ND_FUNCTION {name:_, body:_, stack_size:_} => unreachable!(),
         ND_NOTHING => {}
         ND_RETURN { ret } => {
             gen(*ret, scope_count);
@@ -43,7 +44,23 @@ pub fn gen(node: Node, scope_count: &mut u32) {
             for i in (0..nargs).rev() {
                 println!("  pop {}", argreg[i]);
             }
+            // ABIの制約のため、RSPを16の倍数にしておく必要がある
+            let sc = scope_count.clone();
+            *scope_count += 1;
+            println!("  mov rax, rsp");
+            // raxの下位４ビットを切り出す
+            // 下位４ビットが0←→16の倍数
+            println!("  and rax, 15");
+            println!("  jnz .L.call.{}", sc);
+            println!("  mov rax, 0");
             println!("  call {}", name);
+            println!("  jmp .L.end.{}", sc);
+            println!(".L.call.{}:", sc);
+            println!("  sub rsp, 8");
+            println!("  mov rax, 0");
+            println!("  call {}", name);
+            println!("  add rsp, 8");
+            println!(".L.end.{}:", sc);
             println!("  push rax");
         }
         ND_BLOCK { stmts } => {

@@ -72,7 +72,8 @@ pub enum Node {
     },
     ND_FUNCTION {
         name: String,
-        body: Vec<Node>
+        body: Vec<Node>,
+        stack_size: u32
     }
 }
 
@@ -148,28 +149,34 @@ fn expect_number(tokens: &mut VecDeque<Token>) -> Result<u32, String> {
 
 // program = function*
 pub fn program(tokens: &mut VecDeque<Token>) -> Vec<Node> {
-    let mut lvars: VecDeque<LVar> = VecDeque::new();
+    //let mut lvars: VecDeque<LVar> = VecDeque::new();
     let mut nodes: Vec<Node> = Vec::new();
     while !tokens.is_empty() {
-        nodes.push(function(tokens, &mut lvars));
+        //nodes.push(function(tokens, &mut lvars));
+        nodes.push(function(tokens));
     }
     return nodes;
 }
 
 // function = ident "(" ")" "{" stmt* "}"
-fn function(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
+fn function(tokens: &mut VecDeque<Token>) -> Node {
+    let mut lvars: VecDeque<LVar> = VecDeque::new();
     if let Some(token) = consume_tk(tokens, TK_IDENT) {
         expect(tokens, "(");
         expect(tokens, ")");
         expect(tokens, "{");
         let mut body: Vec<Node> = Vec::new();
         while !consume(tokens, "}") {
-            body.push(stmt(tokens, lvars));
+            body.push(stmt(tokens, &mut lvars));
         }
-        expect(tokens, "}");
+        let stack_size = if let Some(lvar) = lvars.back() {
+            lvar.offset
+        } else {
+            0
+        };
         return ND_FUNCTION {
             name: token.str,
-            body
+            body, stack_size
         }
     } else {
         eprintln!("関数名を期待しましたが、ありませんでした");
