@@ -1,8 +1,9 @@
 use std::env;
 
 use lang::codegen::gen;
-use lang::codegen::program;
-use lang::parse::tokenize;
+use lang::parse::program;
+use lang::parse::Node::ND_FUNCTION;
+use lang::tokenize::tokenize;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -15,21 +16,34 @@ fn main() {
     let nodes = program(&mut tokens);
 
     println!(".intel_syntax noprefix");
-    println!(".global main");
-    println!("main:");
-
-    // 変数用の領域を確保する
-    println!("  push rbp");
-    println!("  mov rbp, rsp");
-    println!("  sub rsp, 208");
 
     let mut scope_count = 0;
     for node in nodes {
-        gen(node, &mut scope_count);
-        println!("  pop rax");
-    }
+        match node {
+            ND_FUNCTION {
+                name,
+                body,
+                stack_size,
+            } => {
+                println!(".global {}", name);
+                println!("{}:", name);
 
-    println!("  mov rsp, rbp");
-    println!("  pop rbp");
-    println!("  ret");
+                // Prologue
+                println!("  push rbp");
+                println!("  mov rbp, rsp");
+                println!("  sub rsp, {}", stack_size);
+
+                // Emit code
+                for bnode in body {
+                    gen(bnode, &mut scope_count);
+                }
+                // Epilogue
+                println!(".L.return.{}:", name);
+                println!("  mov rsp, rbp");
+                println!("  pop rbp");
+                println!("  ret");
+            }
+            _ => unreachable!(),
+        }
+    }
 }
