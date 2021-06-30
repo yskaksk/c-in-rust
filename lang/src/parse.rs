@@ -1,4 +1,6 @@
-use crate::tokenize::TokenKind::{TK_FOR, TK_IDENT, TK_IF, TK_NUM, TK_RESERVED, TK_RETURN, TK_WHILE};
+use crate::tokenize::TokenKind::{
+    TK_FOR, TK_IDENT, TK_IF, TK_NUM, TK_RESERVED, TK_RETURN, TK_WHILE,
+};
 use crate::tokenize::{Token, TokenKind};
 use std::collections::VecDeque;
 
@@ -73,8 +75,8 @@ pub enum Node {
     ND_FUNCTION {
         name: String,
         body: Vec<Node>,
-        stack_size: u32
-    }
+        stack_size: u32,
+    },
 }
 
 use Node::*;
@@ -176,8 +178,9 @@ fn function(tokens: &mut VecDeque<Token>) -> Node {
         };
         return ND_FUNCTION {
             name: token.str,
-            body, stack_size
-        }
+            body,
+            stack_size,
+        };
     } else {
         eprintln!("関数名を期待しましたが、ありませんでした");
         std::process::exit(1);

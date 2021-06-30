@@ -20,7 +20,11 @@ fn main() {
     let mut scope_count = 0;
     for node in nodes {
         match node {
-            ND_FUNCTION {name, body, stack_size} => {
+            ND_FUNCTION {
+                name,
+                body,
+                stack_size,
+            } => {
                 println!(".global {}", name);
                 println!("{}:", name);
 
@@ -39,7 +43,7 @@ fn main() {
                 println!("  pop rbp");
                 println!("  ret");
             }
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }

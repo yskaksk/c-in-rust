@@ -26,7 +26,11 @@ fn gen_bin_op(lhs: Node, rhs: Node, scope_count: &mut u32) {
 pub fn gen(node: Node, scope_count: &mut u32) {
     let argreg = vec!["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
     match node {
-        ND_FUNCTION {name:_, body:_, stack_size:_} => unreachable!(),
+        ND_FUNCTION {
+            name: _,
+            body: _,
+            stack_size: _,
+        } => unreachable!(),
         ND_NOTHING => {}
         ND_RETURN { ret } => {
             gen(*ret, scope_count);
