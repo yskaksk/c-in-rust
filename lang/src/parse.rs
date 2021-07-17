@@ -4,7 +4,7 @@ use crate::tokenize::TokenKind::{
 use crate::tokenize::{Token, TokenKind};
 use std::collections::VecDeque;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Node {
     ND_NOTHING,
     ND_ADD {
@@ -75,13 +75,14 @@ pub enum Node {
     ND_FUNCTION {
         name: String,
         body: Vec<Node>,
+        parameters: VecDeque<Node>,
         stack_size: u32,
     },
 }
 
 use Node::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct LVar {
     name: String,
     offset: u32,
@@ -151,39 +152,51 @@ fn expect_number(tokens: &mut VecDeque<Token>) -> Result<u32, String> {
 
 // program = function*
 pub fn program(tokens: &mut VecDeque<Token>) -> Vec<Node> {
-    //let mut lvars: VecDeque<LVar> = VecDeque::new();
     let mut nodes: Vec<Node> = Vec::new();
     while !tokens.is_empty() {
-        //nodes.push(function(tokens, &mut lvars));
         nodes.push(function(tokens));
     }
     return nodes;
 }
 
-// function = ident "(" ")" "{" stmt* "}"
+// function = ident "(" params? ")" "{" stmt* "}"
 fn function(tokens: &mut VecDeque<Token>) -> Node {
     let mut lvars: VecDeque<LVar> = VecDeque::new();
     if let Some(token) = consume_tk(tokens, TK_IDENT) {
         expect(tokens, "(");
+        let parameters = params(tokens, &mut lvars);
         expect(tokens, ")");
         expect(tokens, "{");
         let mut body: Vec<Node> = Vec::new();
         while !consume(tokens, "}") {
             body.push(stmt(tokens, &mut lvars));
         }
-        let stack_size = if let Some(lvar) = lvars.back() {
-            lvar.offset
-        } else {
-            0
-        };
+        let stack_size = 8 * lvars.len() as u32;
         return ND_FUNCTION {
             name: token.str,
             body,
+            parameters,
             stack_size,
         };
     } else {
         eprintln!("関数名を期待しましたが、ありませんでした");
         std::process::exit(1);
+    }
+}
+
+// params   = ident ("," ident)*
+fn params(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> VecDeque<Node> {
+    let mut prms: VecDeque<Node> = VecDeque::new();
+    if let Some(token) = consume_tk(tokens, TK_IDENT) {
+        prms.push_back(local_var(token, lvars));
+        while consume(tokens, ",") {
+            if let Some(token) = consume_tk(tokens, TK_IDENT) {
+                prms.push_back(local_var(token, lvars))
+            }
+        }
+        return prms;
+    } else {
+        return prms;
     }
 }
 
@@ -410,22 +423,26 @@ fn primary(tokens: &mut VecDeque<Token>, lvars: &mut VecDeque<LVar>) -> Node {
                 args,
             };
         } else {
-            return if let Some(lvar) = find_lvar(&token, lvars) {
-                ND_LVAR {
-                    offset: lvar.offset,
-                }
-            } else {
-                let offset = match lvars.front() {
-                    Some(lv) => lv.offset + 8,
-                    None => 0,
-                };
-                lvars.push_front(LVar {
-                    name: token.str,
-                    offset,
-                });
-                ND_LVAR { offset }
-            };
+            return local_var(token, lvars);
         }
     }
     return ND_NUM(expect_number(tokens).unwrap());
+}
+
+fn local_var(token: Token, lvars: &mut VecDeque<LVar>) -> Node {
+    return if let Some(lvar) = find_lvar(&token, lvars) {
+        ND_LVAR {
+            offset: lvar.offset,
+        }
+    } else {
+        let offset = match lvars.front() {
+            Some(lv) => lv.offset + 8,
+            None => 0,
+        };
+        lvars.push_front(LVar {
+            name: token.str.clone(),
+            offset,
+        });
+        ND_LVAR { offset }
+    };
 }

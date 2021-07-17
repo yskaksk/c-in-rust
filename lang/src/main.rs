@@ -1,8 +1,7 @@
 use std::env;
 
-use lang::codegen::gen;
+use lang::codegen::codegen;
 use lang::parse::program;
-use lang::parse::Node::ND_FUNCTION;
 use lang::tokenize::tokenize;
 
 fn main() {
@@ -17,33 +16,5 @@ fn main() {
 
     println!(".intel_syntax noprefix");
 
-    let mut scope_count = 0;
-    for node in nodes {
-        match node {
-            ND_FUNCTION {
-                name,
-                body,
-                stack_size,
-            } => {
-                println!(".global {}", name);
-                println!("{}:", name);
-
-                // Prologue
-                println!("  push rbp");
-                println!("  mov rbp, rsp");
-                println!("  sub rsp, {}", stack_size);
-
-                // Emit code
-                for bnode in body {
-                    gen(bnode, &mut scope_count);
-                }
-                // Epilogue
-                println!(".L.return.{}:", name);
-                println!("  mov rsp, rbp");
-                println!("  pop rbp");
-                println!("  ret");
-            }
-            _ => unreachable!(),
-        }
-    }
+    codegen(nodes);
 }
